@@ -1,3 +1,6 @@
+curl -s https://soupcan.xyz/setup-arch.sh | bash
+
+
 # --- CONNECT TO INTERNET ---
 ping archlinux.org -c 2
 nmtui
