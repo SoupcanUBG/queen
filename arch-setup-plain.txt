@@ -1,0 +1,62 @@
+# --- CONNECT TO INTERNET ---
+ping archlinux.org -c 2
+nmtui
+
+# --- FORMAT AND MOUNT ---
+mkfs.btrfs -f /dev/nvme0n1p4
+mount /dev/nvme0n1p4 /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+umount /mnt
+
+mount -o noatime,compress=zstd,subvol=@ /dev/nvme0n1p4 /mnt
+mkdir -p /mnt/{boot/efi,home}
+mount -o noatime,compress=zstd,subvol=@home /dev/nvme0n1p4 /mnt/home
+mount /dev/nvme0n1p1 /mnt/boot/efi
+
+# --- INSTALL BASE SYSTEM ---
+pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs grub efibootmgr sudo networkmanager
+pacstrap -K /mnt xorg xorg-xinit xfce4 xfce4-goodies firefox xbindkeys steam heroic-games-launcher-bin
+pacstrap -K /mnt wine wine-mono wine-gecko lib32-mesa lib32-nvidia-utils xboxdrv git
+
+# --- GENERATE FSTAB ---
+genfstab -U /mnt >> /mnt/etc/fstab
+
+# --- CHROOT ---
+arch-chroot /mnt
+
+# --- INSIDE CHROOT ---
+ln -sf /usr/share/zoneinfo/Europe/London /etc/localtime
+hwclock --systohc
+echo archgame > /etc/hostname
+sed -i 's/#en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen
+echo LANG=en_GB.UTF-8 > /etc/locale.conf
+
+useradd -m -G wheel toby
+echo "toby:password" | chpasswd
+echo "root:root" | chpasswd
+echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
+
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
+grub-mkconfig -o /boot/grub/grub.cfg
+
+systemctl enable NetworkManager
+
+exit
+
+# --- AFTER REBOOT (as user toby) ---
+echo '[[ -z $DISPLAY && $(tty) == /dev/tty1 ]] && exec startx' >> ~/.bash_profile
+
+echo "xfce4-panel &" > ~/.xinitrc
+echo "xfwm4 &" >> ~/.xinitrc
+echo "xbindkeys &" >> ~/.xinitrc
+echo "heroic" >> ~/.xinitrc
+chmod +x ~/.xinitrc
+
+echo '"firefox"
+  Mod4 + b
+' > ~/.xbindkeysrc
+echo '"steam steam://rungameid/302550"
+  Mod4 + a
+' >> ~/.xbindkeysrc
